@@ -72,7 +72,7 @@ func TestLookup(t *testing.T) {
 		}
 
 		for _, ip := range ips {
-			if ip.To4() == nil && ip.To16() == nil {
+			if ip.IP.To4() == nil && ip.IP.To16() == nil {
 				t.Fatalf("got %v; want an IP address", ip)
 			}
 		}
@@ -85,10 +85,13 @@ func TestLookupCache(t *testing.T) {
 		lookupIP = originalFunc
 	}()
 
-	want := []net.IP{
-		net.IP("35.190.50.136"),
+	netaddr := net.IPAddr{}
+	netaddr.IP = net.IP("35.190.50.136")
+	want := []net.IPAddr{
+		netaddr,
+
 	}
-	lookupIP = func(ctx context.Context, host string) ([]net.IP, error) {
+	lookupIP = func(ctx context.Context, host string) ([]net.IPAddr, error) {
 		return want, nil
 	}
 
@@ -123,7 +126,7 @@ func TestLookupTimeout(t *testing.T) {
 
 	ctx, cancelF := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancelF()
-	lookupIP = func(ctx context.Context, host string) ([]net.IP, error) {
+	lookupIP = func(ctx context.Context, host string) ([]net.IPAddr, error) {
 		for {
 			select {
 			case <-ctx.Done():
@@ -149,24 +152,37 @@ func TestRefresh(t *testing.T) {
 		lookupIP = originalFunc
 	}()
 
-	want := []net.IP{
-		net.IP("4.4.4.4"),
+	netaddr := net.IPAddr{}
+	netaddr.IP = net.IP("4.4.4.4")
+	want := []net.IPAddr{
+		netaddr,
+
 	}
-	lookupIP = func(ctx context.Context, host string) ([]net.IP, error) {
+
+	lookupIP = func(ctx context.Context, host string) ([]net.IPAddr, error) {
 		return want, nil
 	}
 
+	netaddr1 := net.IPAddr{}
+	netaddr1.IP = net.IP("1.1.1.1")
+
+	netaddr2 := net.IPAddr{}
+	netaddr2.IP = net.IP("2.2.2.2")
+
+	netaddr3 := net.IPAddr{}
+	netaddr3.IP = net.IP("3.3.3.3")
+
 	resolver := testResolver(t)
 	defer resolver.Stop()
-	resolver.cache = map[string][]net.IP{
+	resolver.cache = map[string][]net.IPAddr{
 		"deeeet.jp": {
-			net.IP("1.1.1.1"),
+			netaddr1,
 		},
 		"deeeet.us": {
-			net.IP("2.2.2.2"),
+			netaddr2,
 		},
 		"deeeet.uk": {
-			net.IP("3.3.3.3"),
+			netaddr3,
 		},
 	}
 
@@ -213,8 +229,8 @@ func TestFetch(t *testing.T) {
 		lookupIP = originalFunc
 	}()
 
-	var returnIPs []net.IP
-	lookupIP = func(ctx context.Context, host string) ([]net.IP, error) {
+	var returnIPs []net.IPAddr
+	lookupIP = func(ctx context.Context, host string) ([]net.IPAddr, error) {
 		mu.Lock()
 		ips := returnIPs
 		mu.Unlock()
@@ -225,9 +241,15 @@ func TestFetch(t *testing.T) {
 	resolver := testResolver(t)
 	defer resolver.Stop()
 
-	want1 := []net.IP{
-		net.IP("10.0.0.1"),
+	
+
+	netaddr := net.IPAddr{}
+	netaddr.IP = net.IP("10.0.0.1")
+	want1 := []net.IPAddr{
+		netaddr,
+
 	}
+	
 	mu.Lock()
 	returnIPs = want1
 	mu.Unlock()
@@ -241,8 +263,12 @@ func TestFetch(t *testing.T) {
 		t.Fatalf("want %#v, got %#v", want1, got1)
 	}
 
-	want2 := []net.IP{
-		net.IP("10.0.0.2"),
+
+	netaddr2 := net.IPAddr{}
+	netaddr2.IP = net.IP("10.0.0.2")
+	want2 := []net.IPAddr{
+		netaddr2,
+
 	}
 	mu.Lock()
 	returnIPs = want2
@@ -287,7 +313,7 @@ func TestErrorLog(t *testing.T) {
 		done <- struct{}{}
 	}
 
-	lookupIP = func(ctx context.Context, host string) ([]net.IP, error) {
+	lookupIP = func(ctx context.Context, host string) ([]net.IPAddr, error) {
 		return nil, fmt.Errorf("err")
 	}
 

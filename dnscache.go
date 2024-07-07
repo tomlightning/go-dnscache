@@ -21,18 +21,8 @@ var (
 
 // lookupIP is a wrapper of net.DefaultResolver.LookupIPAddr.
 // This is used to replace lookup function when test.
-var lookupIP = func(ctx context.Context, host string) ([]net.IP, error) {
-	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-	if err != nil {
-		return nil, err
-	}
-
-	ips := make([]net.IP, len(addrs))
-	for i, ia := range addrs {
-		ips[i] = ia.IP
-	}
-
-	return ips, nil
+var lookupIP = func(ctx context.Context, host string) ([]net.IPAddr, error) {
+	return net.DefaultResolver.LookupIPAddr(ctx, host)
 }
 
 // onRefreshed is called when DNS are refreshed.
@@ -40,11 +30,11 @@ var onRefreshed = func() {}
 
 // Resolver is DNS cache resolver which cache DNS resolve results in memory.
 type Resolver struct {
-	lookupIPFn    func(ctx context.Context, host string) ([]net.IP, error)
+	lookupIPFn    func(ctx context.Context, host string) ([]net.IPAddr, error)
 	lookupTimeout time.Duration
 
 	lock  sync.RWMutex
-	cache map[string][]net.IP
+	cache map[string][]net.IPAddr
 
 	// defaultLookupTimeout is used when refreshing DNS cache
 	defaultLookupTimeout time.Duration
@@ -78,7 +68,7 @@ func New(freq time.Duration, lookupTimeout time.Duration, options ...Option) (*R
 	r := &Resolver{
 		lookupIPFn:           lookupIPFn,
 		lookupTimeout:        lookupTimeout,
-		cache:                make(map[string][]net.IP, cacheSize),
+		cache:                make(map[string][]net.IPAddr, cacheSize),
 		defaultLookupTimeout: lookupTimeout,
 		logger:               slog.Default(),
 		closer:               closer,
@@ -105,7 +95,7 @@ func New(freq time.Duration, lookupTimeout time.Duration, options ...Option) (*R
 
 // LookupIP lookups IP list from DNS server then it saves result in the cache.
 // If you want to get result from the cache use `Fetch` function.
-func (r *Resolver) LookupIP(ctx context.Context, addr string) ([]net.IP, error) {
+func (r *Resolver) LookupIP(ctx context.Context, addr string) ([]net.IPAddr, error) {
 	ips, err := r.lookupIPFn(ctx, addr)
 	if err != nil {
 		return nil, err
@@ -119,7 +109,7 @@ func (r *Resolver) LookupIP(ctx context.Context, addr string) ([]net.IP, error) 
 
 // Fetch fetches IP list from the cache. If IP list of the given addr is not in the cache,
 // then it lookups from DNS server by `Lookup` function.
-func (r *Resolver) Fetch(ctx context.Context, addr string) ([]net.IP, error) {
+func (r *Resolver) Fetch(ctx context.Context, addr string) ([]net.IPAddr, error) {
 	r.lock.RLock()
 	ips, ok := r.cache[addr]
 	r.lock.RUnlock()
@@ -127,6 +117,11 @@ func (r *Resolver) Fetch(ctx context.Context, addr string) ([]net.IP, error) {
 		return ips, nil
 	}
 	return r.LookupIP(ctx, addr)
+}
+
+
+func (r *Resolver) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) { 
+	return r.Fetch(ctx, host)
 }
 
 // Refresh refreshes IP list cache.

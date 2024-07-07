@@ -1,3 +1,3 @@
-module go.mercari.io/go-dnscache
+module github.com/tomlightning/go-dnscache
 
-go 1.21
+go 1.22

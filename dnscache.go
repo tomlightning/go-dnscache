@@ -19,10 +19,23 @@ var (
 	defaultLookupTimeout = 10 * time.Second
 )
 
+var extResolver = net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout:   2 * time.Second,
+				KeepAlive: 2 * time.Second,
+			}
+			return d.DialContext(ctx, "udp", "8.8.8.8:53")
+		},
+	}
+
 // lookupIP is a wrapper of net.DefaultResolver.LookupIPAddr.
 // This is used to replace lookup function when test.
 var lookupIP = func(ctx context.Context, host string) ([]net.IPAddr, error) {
-	return net.DefaultResolver.LookupIPAddr(ctx, host)
+	
+
+	return extResolver.LookupIPAddr(ctx, host)
 }
 
 // onRefreshed is called when DNS are refreshed.
@@ -140,6 +153,13 @@ func (r *Resolver) Refresh() {
 				"error", err,
 				"addr", addr,
 			)
+			// Retry once
+			if _, err := r.LookupIP(ctx, addr); err != nil {
+				r.logger.Error("failed to refresh DNS cache on retry",
+					"error", err,
+					"addr", addr,
+				)
+			}
 		}
 		cancelF()
 	}
